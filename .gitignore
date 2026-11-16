@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+.pydeps
+_extract_*
+_states.json
+_map_paths.json
+*.tsbuildinfo
