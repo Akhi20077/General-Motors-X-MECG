@@ -32,6 +32,9 @@ import {
   type Build,
   type Scenario,
 } from "./model";
+import { POSTINGS, bestPosting } from "./postings";
+
+type Panel = "adjust" | "breakdown" | "postings" | "ladder" | "regions" | "compare" | "forecast" | "quote" | "sources";
 
 const GROUPS: { id: RateGroup; label: string; live: boolean }[] = [
   { id: "direct", label: "Direct", live: true },
@@ -45,6 +48,7 @@ const LARGE = new Set(["MI", "NY", "PA", "OH", "VA", "NC", "SC", "GA", "IN", "WI
 export default function App() {
   const [scenario, setScenario] = useState<Scenario>(INITIAL);
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState<Panel | null>(null);
 
   const patch = (partial: Partial<Scenario>) => setScenario((s) => ({ ...s, ...partial }));
   const modeled: "direct" | "skilled" = scenario.group === "skilled" ? "skilled" : "direct";
@@ -64,6 +68,14 @@ export default function App() {
   const flag = judgeQuote(quoteValue, rate);
   const note = narrative(rate, selected, scenario);
   const baseline = isBaseline(scenario, modeled);
+  const posting = bestPosting(scenario.stateAbbr, scenario.group === "skilled" ? "skilled" : scenario.group);
+  const markets = [...STATES.map((s) => ({ abbr: s.abbr, name: s.name })), { abbr: "OH", name: "Ohio" }].sort(
+    (a, b) => a.name.localeCompare(b.name),
+  );
+
+  function toggle(panel: Panel) {
+    setOpen((current) => (current === panel ? null : panel));
+  }
 
   async function copyNote() {
     try {
@@ -80,59 +92,24 @@ export default function App() {
       <header className="top">
         <div className="top-row">
           <div className="brand">
-            <div className="mark">MECG</div>
+            <img className="mark" src="/gm.png" alt="GM" />
             <div>
-              <p className="eyebrow">Michigan Engineering Consulting Group · General Motors</p>
-              <h1>Fringe Cost Dashboard</h1>
+              <p className="eyebrow">General Motors</p>
+              <h1>Fringe cost</h1>
             </div>
           </div>
           <p className="vintage">
             Factory labor rates
-            <span>Research vintage {VINTAGE}</span>
+            <span>Vintage {VINTAGE}</span>
           </p>
         </div>
-        <nav className="jump">
-          <a href="#rate">Rate</a>
-          <a href="#regions">Regions</a>
-          <a href="#compare">Compare</a>
-          <a href="#forecast">Forecast</a>
-          <a href="#quote">Quote check</a>
-          <a href="#sources">Sources</a>
-        </nav>
       </header>
 
       <main className="page">
-        <aside className="rail">
+        {open === "adjust" && <aside className="rail">
           <section className="card">
-            <h2>Scenario</h2>
-            <p className="lede">
-              These inputs rebuild the UAW–GM hour. State benchmarks stay at the published vintage.
-            </p>
-            <div className="seg" role="group" aria-label="Labor group">
-              {GROUPS.map((g) => (
-                <button
-                  key={g.id}
-                  className={scenario.group === g.id ? "on" : ""}
-                  aria-pressed={scenario.group === g.id}
-                  onClick={() => patch({ group: g.id })}
-                >
-                  {g.label}
-                  {!g.live && <em>Gap</em>}
-                </button>
-              ))}
-            </div>
-            <div className="seg levels" role="group" aria-label="Wage level">
-              {LEVELS.map((level) => (
-                <button
-                  key={level.id}
-                  className={scenario.level === level.id ? "on" : ""}
-                  aria-pressed={scenario.level === level.id}
-                  onClick={() => patch({ level: level.id })}
-                >
-                  {level.label}
-                </button>
-              ))}
-            </div>
+            <h2>Assumptions</h2>
+            <p className="lede">These rebuild the UAW–GM hour. State averages and Indeed postings stay fixed.</p>
             <Slider
               label="COLA float"
               hint="June 2026 verified float is $1.73. Later quarters add the step below."
@@ -261,52 +238,102 @@ export default function App() {
               <button onClick={() => patch({ profitShare: 14500 })}>2024 profit sharing</button>
             </div>
           </section>
-        </aside>
+        </aside>}
 
-        <div className="stack">
-          <section id="rate" className="card hero">
-            {gap && (
-              <p className="banner">
-                {scenario.group === "indirect" ? "Indirect labor" : "Salaried plant support"} is in the
-                project brief and not in this vintage. No rate is invented for it. The figures below stay
-                on {modeled === "skilled" ? "skilled trades" : "direct labor"}.
+        <section id="rate" className="card hero">
+          <div className="controls">
+            <div className="seg" role="group" aria-label="Labor group">
+              {GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  className={scenario.group === g.id ? "on" : ""}
+                  aria-pressed={scenario.group === g.id}
+                  onClick={() => patch({ group: g.id })}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+            <div className="seg levels" role="group" aria-label="Wage level">
+              {LEVELS.map((level) => (
+                <button
+                  key={level.id}
+                  className={scenario.level === level.id ? "on" : ""}
+                  aria-pressed={scenario.level === level.id}
+                  onClick={() => patch({ level: level.id })}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+            <label className="state-pick">
+              State
+              <select value={scenario.stateAbbr} onChange={(e) => patch({ stateAbbr: e.target.value })}>
+                {markets.map((market) => (
+                  <option key={market.abbr} value={market.abbr}>{market.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="hero-top">
+            <div>
+              <p className="kicker">Fully fringed · profit sharing excluded</p>
+              <p className="figure">{money(rate.total)}</p>
+              <p className="per">
+                {gap
+                  ? "Contract rate · direct labor, shown for comparison"
+                  : `${LEVELS.find((l) => l.id === rate.level)?.label} · ${modeled === "skilled" ? "Skilled trades" : "Direct"} · per hour worked`}
               </p>
-            )}
-            <div className="hero-top">
-              <div>
-                <p className="kicker">Fully fringed rate · profit sharing excluded</p>
-                <p className="figure">{money(rate.total)}</p>
-                <p className="per">per hour worked</p>
-              </div>
-              <dl className="stats">
-                <div>
-                  <dt>Wage + COLA</dt>
-                  <dd>{money(rate.wage)}</dd>
-                </div>
-                <div>
-                  <dt>Benefits</dt>
-                  <dd>{money(rate.benefits)}</dd>
-                </div>
-                <div>
-                  <dt>Benefits / wages</dt>
-                  <dd>{pct(rate.benefitPct)}</dd>
-                </div>
-                <div>
-                  <dt>With profit sharing</dt>
-                  <dd>{money(rate.withProfit)}</dd>
-                </div>
-              </dl>
             </div>
-            <p className="who">
-              {LEVELS.find((l) => l.id === rate.level)?.detail} · {modeled === "skilled" ? "Skilled trades" : "Direct production"} · UAW–GM national agreement
-              {rate.gwiApplied ? " · September 2027 5% general wage increase is in the base" : ""}
-            </p>
+            <div className="posting-side">
+              <p className="kicker">Indeed base pay</p>
+              {posting ? (
+                <>
+                  <p className="figure small">{posting.unit === "year" ? money(posting.avg, 0) : money(posting.avg)}</p>
+                  <p className="per">{posting.title} · {posting.place}{posting.unit === "year" ? " / year" : " / hour"}</p>
+                </>
+              ) : (
+                <>
+                  <p className="figure small quiet">—</p>
+                  <p className="per">No public Indeed page for this role in {markets.find((m) => m.abbr === scenario.stateAbbr)?.name}</p>
+                </>
+              )}
+            </div>
+          </div>
+          <dl className="stats">
+            <div><dt>Wage + COLA</dt><dd>{money(rate.wage)}</dd></div>
+            <div><dt>Benefits</dt><dd>{money(rate.benefits)}</dd></div>
+            <div><dt>With profit sharing</dt><dd>{money(rate.withProfit)}</dd></div>
+            <div><dt>Health band</dt><dd>{money(rate.low)}–{money(rate.high)}</dd></div>
+          </dl>
+          {gap && (
             <p className="band">
-              Health-cost band {money(rate.low)} – {money(rate.high)}. Wage confidence is high. The total is medium because health is an ECEC proxy, not GM’s plant cost.
+              The contract figure is direct or skilled trades. {scenario.group === "indirect" ? "Indirect" : "Salaried"} pay on the right is Indeed base pay, not a fringed GM hour.
             </p>
-            <div className="stackbar" aria-hidden="true">
-              <Stack rate={rate} />
-            </div>
+          )}
+          <div className="panels">
+            {([
+              ["adjust", "Adjust"],
+              ["breakdown", "Breakdown"],
+              ["postings", "Job postings"],
+              ["ladder", "Wage ladder"],
+              ["regions", "Regions"],
+              ["compare", "Compare"],
+              ["forecast", "Forecast"],
+              ["quote", "Quote check"],
+              ["sources", "Sources"],
+            ] as const).map(([id, label]) => (
+              <button key={id} className={open === id ? "on" : ""} aria-expanded={open === id} onClick={() => toggle(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {open === "breakdown" && (
+          <section className="card">
+            <h2>Fringe breakdown</h2>
+            <div className="stackbar" aria-hidden="true"><Stack rate={rate} /></div>
             <ul className="swatches">
               <li><i className="sw base" /> Base</li>
               <li><i className="sw cola" /> COLA</li>
@@ -317,28 +344,23 @@ export default function App() {
               <li><i className="sw post" /> Retiree health</li>
             </ul>
             <Bridge rate={rate} />
-            <div className="split">
-              <p>
-                Annualized at {scenario.workedHours.toLocaleString("en-US")} hours worked: <strong>{money(rate.annual, 0)}</strong> before profit sharing, <strong>{money(rate.annualWithProfit, 0)}</strong> with the {money(scenario.profitShare, 0)} payout.
-              </p>
-              <p>
-                {scenario.quarter === 0
-                  ? `COLA is still a float. It folds into base, less 5¢, at expiry on ${CONTRACT_EXPIRY}. Move the forecast point to see that opening base.`
-                  : <>On this forecast point, folding the float into base less 5¢ produces an opening base of <strong>{money(rate.foldedBase)}</strong>. Contract ends {CONTRACT_EXPIRY}.</>}
-              </p>
-            </div>
-            {baseline && (
-              <p className="cross">
-                Cross-check at this baseline: applying the ECEC union-manufacturing benefit ratio (73.4%) to the $40.94 wage gives $71.01, next to $70.82 with the 2025 profit-sharing layer.
-              </p>
-            )}
+            <p className="lede">
+              About {money(rate.annual, 0)} a year at {scenario.workedHours.toLocaleString("en-US")} hours, before profit sharing.
+              {scenario.quarter === 0
+                ? ` COLA folds into base, less 5¢, on ${CONTRACT_EXPIRY}.`
+                : ` Opening base on this path: ${money(rate.foldedBase)}.`}
+            </p>
+            {baseline && <p className="cross">ECEC cross-check at this baseline: $71.01 versus $70.82 with 2025 profit sharing.</p>}
             <div className="note-row">
               <p className="note">{note}</p>
               <button className="copy" onClick={copyNote}>{copied ? "Copied" : "Copy note"}</button>
             </div>
           </section>
+        )}
 
-          <section className="card">
+        {open === "postings" && <PostingTable />}
+
+        {open === "ladder" && <section className="card">
             <h2>Wage ladder</h2>
             <p className="lede">
               Same national card at Tonawanda, Lockport, Rochester, Flint, and Detroit. Progression was cut from eight years to three.
@@ -373,9 +395,9 @@ export default function App() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </section>}
 
-          <section id="regions" className="card">
+        {open === "regions" && <section id="regions" className="card">
             <div className="section-head">
               <h2>Regions</h2>
               <p className="lede">
@@ -387,9 +409,9 @@ export default function App() {
               <StateDetail abbr={scenario.stateAbbr} bench={selected} gm={rate.total} />
             </div>
             <RankTable abbr={scenario.stateAbbr} onPick={(stateAbbr) => patch({ stateAbbr })} />
-          </section>
+          </section>}
 
-          <section id="compare" className="card">
+        {open === "compare" && <section id="compare" className="card">
             <h2>Compare</h2>
             <p className="lede">
               Read the label before the bar. These are not the same worker, the same year, or the same benefit package.
@@ -407,9 +429,9 @@ export default function App() {
                 </article>
               ))}
             </div>
-          </section>
+          </section>}
 
-          <section id="forecast" className="card">
+        {open === "forecast" && <section id="forecast" className="card">
             <h2>Path to the 2028 talks</h2>
             <p className="lede">
               One raise is left in the contract, 5% in September 2027. After that, wage growth until expiry comes from COLA. The shaded band is the health sensitivity at every point.
@@ -436,9 +458,9 @@ export default function App() {
                 CPI-W rose 3.5% in the year to August 2026. The June step was 55¢. A rough rule from that step is about 1¢ of COLA per 0.09 CPI-W point, before the 10¢ quarterly health diversion. Volvo NRV (about 2027), Daimler Truck (March 3, 2028), and the Detroit Three (April 30, 2028) expire within roughly 15 months of each other.
               </p>
             </div>
-          </section>
+          </section>}
 
-          <section id="quote" className="card">
+        {open === "quote" && <section id="quote" className="card">
             <h2>Supplier quote check</h2>
             <p className="lede">
               Paste a fully fringed hourly quote. The flag locates it against this scenario’s GM band and the published state range. It is a screen, not a statistical confidence interval.
@@ -469,9 +491,9 @@ export default function App() {
               <strong>{flag.title}</strong>
               {flag.detail}
             </p>
-          </section>
+          </section>}
 
-          <section id="sources" className="card">
+        {open === "sources" && <section id="sources" className="card">
             <h2>Rate dictionary</h2>
             <div className="table-wrap">
               <table className="dict">
@@ -510,19 +532,57 @@ export default function App() {
             <ul className="open">
               <li>GM’s actual health-insurance cost per hour, and the traditional vs in-progression mix at the three New York plants.</li>
               <li>Dollar wage scales for Daimler, Mack, and Volvo.</li>
-              <li>Indirect labor and salaried plant support. The brief asks for both. This vintage does not have them.</li>
+              <li>Skilled-trades posting wages, and Indeed pages for states that did not return a public salary figure. LinkedIn salary pages require a signed-in session.</li>
               <li>Plant-level Michigan and Ohio rates beyond the national UAW card, plus Detroit, Flint, Prudenville, and Idaho from the project brief.</li>
               <li>Industry cuts for plastic molding, assembly, and just-in-time. Current rows are auto contract rates and all-manufacturing averages.</li>
               <li>A live BLS pull. Phase D asks for it. This version cites a fixed vintage so every number can be traced.</li>
             </ul>
-          </section>
-        </div>
+          </section>}
       </main>
       <footer className="foot">
-        <p>MECG × GM · Project 1, factory labor rates · Prepared for purchasing and cost engineering</p>
-        <p>Akhi Kanmanthreddy, project manager · Luisa Bruno Ferré · Daniel Okoye · Kyle Fu · Vivaan Sandwar</p>
+        <p>General Motors · Factory labor rates · Indeed salary pages read November 15, 2026</p>
       </footer>
     </>
+  );
+}
+
+function PostingTable() {
+  return (
+    <section className="card">
+      <h2>Job postings</h2>
+      <p className="lede">
+        Public Indeed salary pages, built from job postings over the prior 36 months. The number is base pay, not a fringed hour. LinkedIn’s salary pages require a signed-in session, so they are not in this table. Pages with fewer than 10 salaries were left out.
+      </p>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Place</th>
+              <th>Title</th>
+              <th>Average</th>
+              <th>Low–high</th>
+              <th>Postings</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {POSTINGS.map((row) => (
+              <tr key={row.url}>
+                <td>{row.place}</td>
+                <td>{row.title}</td>
+                <td>{row.unit === "year" ? money(row.avg, 0) : money(row.avg)}</td>
+                <td>{row.unit === "year" ? `${money(row.low, 0)}–${money(row.high, 0)}` : `${money(row.low)}–${money(row.high)}`}</td>
+                <td>{row.n.toLocaleString("en-US")}</td>
+                <td>
+                  <a href={row.url} target="_blank" rel="noreferrer">{row.updated}</a>
+                  {row.note ? <span className="denom">{row.note}</span> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

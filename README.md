@@ -1,6 +1,6 @@
-# Fringe Cost Dashboard
+# Fringe cost
 
-Fully fringed factory labor rates for GM purchasing. Built by the Michigan Engineering Consulting Group for Project 1, factory labor rates.
+Fully fringed factory labor rates for GM purchasing.
 
 A buyer can see what one UAW–GM hour costs, what sits inside the fringe, how East Coast and Michigan manufacturing averages compare, and whether a supplier quote is near that baseline or far enough to challenge.
 
