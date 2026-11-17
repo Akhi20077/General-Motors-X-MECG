@@ -17,6 +17,7 @@ import {
   STATE_MAX,
   STATE_MIN,
   VINTAGE,
+  extremeState,
   stateByAbbr,
   type RateGroup,
   type StateBench,
@@ -32,7 +33,8 @@ import {
   type Build,
   type Scenario,
 } from "./model";
-import { POSTINGS, bestPosting } from "./postings";
+import { POSTINGS } from "./postings";
+import { ENGINEER, SALARIED_LOAD, engineerByAbbr, salariedCost } from "./engineers";
 
 type Panel = "adjust" | "breakdown" | "postings" | "ladder" | "regions" | "compare" | "forecast" | "quote" | "sources";
 
@@ -42,8 +44,6 @@ const GROUPS: { id: RateGroup; label: string; live: boolean }[] = [
   { id: "indirect", label: "Indirect", live: false },
   { id: "salaried", label: "Salaried", live: false },
 ];
-
-const LARGE = new Set(["MI", "NY", "PA", "OH", "VA", "NC", "SC", "GA", "IN", "WI", "KY", "TN", "FL", "AL", "WV"]);
 
 export default function App() {
   const [scenario, setScenario] = useState<Scenario>(INITIAL);
@@ -68,10 +68,10 @@ export default function App() {
   const flag = judgeQuote(quoteValue, rate);
   const note = narrative(rate, selected, scenario);
   const baseline = isBaseline(scenario, modeled);
-  const posting = bestPosting(scenario.stateAbbr, scenario.group === "skilled" ? "skilled" : scenario.group);
-  const markets = [...STATES.map((s) => ({ abbr: s.abbr, name: s.name })), { abbr: "OH", name: "Ohio" }].sort(
-    (a, b) => a.name.localeCompare(b.name),
-  );
+  const markets = [...STATES].sort((a, b) => a.name.localeCompare(b.name));
+  const stateName = markets.find((market) => market.abbr === scenario.stateAbbr)?.name ?? scenario.stateAbbr;
+  const engineer = engineerByAbbr(scenario.stateAbbr);
+  const salaried = engineer ? salariedCost(engineer.wage) : undefined;
 
   function toggle(panel: Panel) {
     setOpen((current) => (current === panel ? null : panel));
@@ -106,8 +106,98 @@ export default function App() {
       </header>
 
       <main className="page">
-        {open === "adjust" && <aside className="rail">
-          <section className="card">
+
+        <section id="rate" className="card hero">
+          <div className="controls">
+            <div className="seg" role="group" aria-label="Labor group">
+              {GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  className={scenario.group === g.id ? "on" : ""}
+                  aria-pressed={scenario.group === g.id}
+                  onClick={() => patch({ group: g.id })}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+            <div className="seg levels" role="group" aria-label="Wage level">
+              {LEVELS.map((level) => (
+                <button
+                  key={level.id}
+                  className={scenario.level === level.id ? "on" : ""}
+                  aria-pressed={scenario.level === level.id}
+                  onClick={() => patch({ level: level.id })}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+            <label className="state-pick">
+              State
+              <select value={scenario.stateAbbr} onChange={(e) => patch({ stateAbbr: e.target.value })}>
+                {markets.map((market) => (
+                  <option key={market.abbr} value={market.abbr}>{market.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="hero-top">
+            <div>
+              <p className="kicker">Production hour · profit sharing excluded</p>
+              <p className="figure">{money(rate.total)}</p>
+              <p className="per">
+                {gap
+                  ? "Contract rate · direct labor, shown for comparison"
+                  : `${LEVELS.find((l) => l.id === rate.level)?.label} · ${modeled === "skilled" ? "Skilled trades" : "Direct"} · per hour worked`}
+              </p>
+            </div>
+            <div className="posting-side">
+              <p className="kicker">Salaried hour · benefit load included</p>
+              {salaried ? (
+                <>
+                  <p className="figure small">{money(salaried.total)}</p>
+                  <p className="per">{ENGINEER.title} · {stateName} · wage {money(salaried.wage)}</p>
+                </>
+              ) : (
+                <>
+                  <p className="figure small quiet">—</p>
+                  <p className="per">No published industrial-engineer wage for {stateName}</p>
+                </>
+              )}
+            </div>
+          </div>
+          <dl className="stats">
+            <div><dt>Wage + COLA</dt><dd>{money(rate.wage)}</dd></div>
+            <div><dt>Benefits</dt><dd>{money(rate.benefits)}</dd></div>
+            <div><dt>With profit sharing</dt><dd>{money(rate.withProfit)}</dd></div>
+            <div><dt>Health band</dt><dd>{money(rate.low)}–{money(rate.high)}</dd></div>
+          </dl>
+          <p className="band">
+            Left is the UAW–GM production hour. Right is a supplier industrial engineer in {stateName}: the May 2023 mean wage plus a {pct(SALARIED_LOAD)} benefit load from ECEC professional occupations, June 2025.
+            {scenario.group === "indirect" ? " Indirect labor still has no contract rate, so the left figure stays on direct labor." : ""}
+          </p>
+          <div className="panels">
+            {([
+              ["adjust", "Adjust"],
+              ["breakdown", "Breakdown"],
+              ["postings", "Job postings"],
+              ["ladder", "Wage ladder"],
+              ["regions", "State table"],
+              ["compare", "Compare"],
+              ["forecast", "Forecast"],
+              ["quote", "Quote check"],
+              ["sources", "Sources"],
+            ] as const).map(([id, label]) => (
+              <button key={id} className={open === id ? "on" : ""} aria-expanded={open === id} onClick={() => toggle(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {open === "adjust" && (
+          <section className="card panel">
             <h2>Assumptions</h2>
             <p className="lede">These rebuild the UAW–GM hour. State averages and Indeed postings stay fixed.</p>
             <Slider
@@ -238,95 +328,20 @@ export default function App() {
               <button onClick={() => patch({ profitShare: 14500 })}>2024 profit sharing</button>
             </div>
           </section>
-        </aside>}
+        )}
 
-        <section id="rate" className="card hero">
-          <div className="controls">
-            <div className="seg" role="group" aria-label="Labor group">
-              {GROUPS.map((g) => (
-                <button
-                  key={g.id}
-                  className={scenario.group === g.id ? "on" : ""}
-                  aria-pressed={scenario.group === g.id}
-                  onClick={() => patch({ group: g.id })}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
-            <div className="seg levels" role="group" aria-label="Wage level">
-              {LEVELS.map((level) => (
-                <button
-                  key={level.id}
-                  className={scenario.level === level.id ? "on" : ""}
-                  aria-pressed={scenario.level === level.id}
-                  onClick={() => patch({ level: level.id })}
-                >
-                  {level.label}
-                </button>
-              ))}
-            </div>
-            <label className="state-pick">
-              State
-              <select value={scenario.stateAbbr} onChange={(e) => patch({ stateAbbr: e.target.value })}>
-                {markets.map((market) => (
-                  <option key={market.abbr} value={market.abbr}>{market.name}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="hero-top">
-            <div>
-              <p className="kicker">Fully fringed · profit sharing excluded</p>
-              <p className="figure">{money(rate.total)}</p>
-              <p className="per">
-                {gap
-                  ? "Contract rate · direct labor, shown for comparison"
-                  : `${LEVELS.find((l) => l.id === rate.level)?.label} · ${modeled === "skilled" ? "Skilled trades" : "Direct"} · per hour worked`}
-              </p>
-            </div>
-            <div className="posting-side">
-              <p className="kicker">Indeed base pay</p>
-              {posting ? (
-                <>
-                  <p className="figure small">{posting.unit === "year" ? money(posting.avg, 0) : money(posting.avg)}</p>
-                  <p className="per">{posting.title} · {posting.place}{posting.unit === "year" ? " / year" : " / hour"}</p>
-                </>
-              ) : (
-                <>
-                  <p className="figure small quiet">—</p>
-                  <p className="per">No public Indeed page for this role in {markets.find((m) => m.abbr === scenario.stateAbbr)?.name}</p>
-                </>
-              )}
-            </div>
-          </div>
-          <dl className="stats">
-            <div><dt>Wage + COLA</dt><dd>{money(rate.wage)}</dd></div>
-            <div><dt>Benefits</dt><dd>{money(rate.benefits)}</dd></div>
-            <div><dt>With profit sharing</dt><dd>{money(rate.withProfit)}</dd></div>
-            <div><dt>Health band</dt><dd>{money(rate.low)}–{money(rate.high)}</dd></div>
-          </dl>
-          {gap && (
-            <p className="band">
-              The contract figure is direct or skilled trades. {scenario.group === "indirect" ? "Indirect" : "Salaried"} pay on the right is Indeed base pay, not a fringed GM hour.
+        {open === "postings" && <PostingTable />}
+
+        <section id="regions" className="card">
+          <div className="section-head">
+            <h2>Regions</h2>
+            <p className="lede">
+              Every state is colored by its 2025 manufacturing production total, not the GM rate. The number on a state is that total, rounded. Click a state for the wage and the salaried hour.
             </p>
-          )}
-          <div className="panels">
-            {([
-              ["adjust", "Adjust"],
-              ["breakdown", "Breakdown"],
-              ["postings", "Job postings"],
-              ["ladder", "Wage ladder"],
-              ["regions", "Regions"],
-              ["compare", "Compare"],
-              ["forecast", "Forecast"],
-              ["quote", "Quote check"],
-              ["sources", "Sources"],
-            ] as const).map(([id, label]) => (
-              <button key={id} className={open === id ? "on" : ""} aria-expanded={open === id} onClick={() => toggle(id)}>
-                {label}
-              </button>
-            ))}
+          </div>
+          <div className="region-grid">
+            <RegionMap abbr={scenario.stateAbbr} onPick={(stateAbbr) => patch({ stateAbbr })} />
+            <StateDetail abbr={scenario.stateAbbr} bench={selected} gm={rate.total} />
           </div>
         </section>
 
@@ -357,8 +372,6 @@ export default function App() {
             </div>
           </section>
         )}
-
-        {open === "postings" && <PostingTable />}
 
         {open === "ladder" && <section className="card">
             <h2>Wage ladder</h2>
@@ -397,17 +410,11 @@ export default function App() {
             </div>
           </section>}
 
-        {open === "regions" && <section id="regions" className="card">
-            <div className="section-head">
-              <h2>Regions</h2>
-              <p className="lede">
-                Color is the 2025 all-manufacturing production total, not the GM rate. GM’s UAW wage is national, so New York and Michigan plants share one card. The state average is who else is hiring.
-              </p>
-            </div>
-            <div className="region-grid">
-              <RegionMap abbr={scenario.stateAbbr} onPick={(stateAbbr) => patch({ stateAbbr })} />
-              <StateDetail abbr={scenario.stateAbbr} bench={selected} gm={rate.total} />
-            </div>
+        {open === "regions" && <section className="card">
+            <h2>State table</h2>
+            <p className="lede">
+              Same 2025 BLS wage, loaded with the national manufacturing benefit ratio. Union density and unemployment appear only where the October research published them.
+            </p>
             <RankTable abbr={scenario.stateAbbr} onPick={(stateAbbr) => patch({ stateAbbr })} />
           </section>}
 
@@ -533,7 +540,8 @@ export default function App() {
               <li>GM’s actual health-insurance cost per hour, and the traditional vs in-progression mix at the three New York plants.</li>
               <li>Dollar wage scales for Daimler, Mack, and Volvo.</li>
               <li>Skilled-trades posting wages, and Indeed pages for states that did not return a public salary figure. LinkedIn salary pages require a signed-in session.</li>
-              <li>Plant-level Michigan and Ohio rates beyond the national UAW card, plus Detroit, Flint, Prudenville, and Idaho from the project brief.</li>
+              <li>A separate manufacturing-engineer wage. BLS folds that title into industrial engineers, which is the salaried hour on this page. Assembler and material-handler wages by state are still open.</li>
+              <li>Plant-level rates for Detroit, Flint, Prudenville, and Idaho. The map now carries each state’s 2025 manufacturing average, including Idaho at $26.01. It does not carry a plant rate.</li>
               <li>Industry cuts for plastic molding, assembly, and just-in-time. Current rows are auto contract rates and all-manufacturing averages.</li>
               <li>A live BLS pull. Phase D asks for it. This version cites a fixed vintage so every number can be traced.</li>
             </ul>
@@ -548,7 +556,7 @@ export default function App() {
 
 function PostingTable() {
   return (
-    <section className="card">
+    <section className="card postings">
       <h2>Job postings</h2>
       <p className="lede">
         Public Indeed salary pages, built from job postings over the prior 36 months. The number is base pay, not a fringed hour. LinkedIn’s salary pages require a signed-in session, so they are not in this table. Pages with fewer than 10 salaries were left out.
@@ -706,9 +714,14 @@ function Bridge({ rate }: { rate: Build }) {
 
 function fillFor(total: number) {
   const t = Math.min(1, Math.max(0, (total - STATE_MIN) / (STATE_MAX - STATE_MIN)));
-  const a = [246, 226, 168];
-  const b = [0, 39, 76];
+  const a = [214, 227, 255];
+  const b = [9, 85, 255];
   return a.map((channel, i) => Math.round(channel + (b[i] - channel) * t));
+}
+
+function inkFor(rgb: number[]) {
+  const luminance = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+  return luminance < 150 ? "#ffffff" : "#1a1a1a";
 }
 
 function RegionMap({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => void }) {
@@ -721,12 +734,17 @@ function RegionMap({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => v
 
   return (
     <div className="map-wrap">
-      <svg viewBox={`0 0 ${MAP_VIEW.w} ${MAP_VIEW.h}`} role="img" aria-label="Eastern United States and Michigan labor markets">
+      <svg viewBox={`0 0 ${MAP_VIEW.w} ${MAP_VIEW.h}`} role="img" aria-label="United States manufacturing labor costs by state">
         {MAP_STATES.map((state) => {
           const bench = stateByAbbr(state.abbr);
-          const rgb = bench ? fillFor(bench.total) : [230, 223, 210];
-          const ink = bench && rgb[2] < 120 ? "#f7f4ee" : "#1c1915";
-          const showRate = bench && LARGE.has(state.abbr);
+          const engineer = engineerByAbbr(state.abbr);
+          const rgb = bench ? fillFor(bench.total) : [228, 231, 238];
+          const ink = bench ? inkFor(rgb) : "#1a1a1a";
+          const showRate = Boolean(bench && state.wide);
+          const salaried = engineer ? salariedCost(engineer.wage).total : undefined;
+          const tip = bench
+            ? `${state.name}: ${money(bench.total)} manufacturing${salaried == null ? "" : `, ${money(salaried)} industrial engineer`}`
+            : state.name;
           return (
             <g
               key={state.abbr}
@@ -740,15 +758,16 @@ function RegionMap({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => v
               }}
               role="button"
               tabIndex={0}
-              aria-label={bench ? `${state.name}, ${money(bench.total)} fully loaded manufacturing` : state.name}
+              aria-label={tip}
               aria-pressed={abbr === state.abbr}
             >
-              <path d={state.d} style={{ fill: `rgb(${rgb.join(",")})` }} />
-              <text x={state.x} y={showRate ? state.y - 6 : state.y} fill={ink} textAnchor="middle">
+              <path d={state.d} fillRule="evenodd" style={{ fill: `rgb(${rgb.join(",")})` }} />
+              <title>{tip}</title>
+              <text x={state.x} y={showRate ? state.y - 5 : state.y} fill={ink} textAnchor="middle">
                 {state.abbr}
               </text>
               {showRate && bench ? (
-                <text x={state.x} y={state.y + 12} fill={ink} textAnchor="middle" className="rate-label">
+                <text x={state.x} y={state.y + 9} fill={ink} textAnchor="middle" className="rate-label">
                   {cents(bench.total).toFixed(0)}
                 </text>
               ) : null}
@@ -757,7 +776,7 @@ function RegionMap({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => v
         })}
         {pins.map((pin) => (
           <g key={pin.name} className="pin">
-            <circle cx={pin.x} cy={pin.y} r="4.5" />
+            <circle cx={pin.x} cy={pin.y} r="3.2" />
             <title>{pin.name}</title>
           </g>
         ))}
@@ -766,7 +785,7 @@ function RegionMap({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => v
         <span><i className="sw low" /> Lower state total</span>
         <span><i className="sw high" /> Higher state total</span>
         <span><i className="dot" /> Plant in the file</span>
-        <span>Gray states are in the map for geography and have no wage row yet.</span>
+        <span>Alaska and Hawaii are inset</span>
       </p>
     </div>
   );
@@ -780,27 +799,35 @@ function StateDetail({ abbr, bench, gm }: { abbr: string; bench: StateBench | un
       <h3>{bench ? bench.name : MAP_STATES.find((s) => s.abbr === abbr)?.name ?? abbr}</h3>
       {bench ? (
         <>
-          <p className="detail-rate">{money(bench.total)} <span>manufacturing, fully loaded</span></p>
+          <p className="detail-rate">{money(bench.total)} <span>production hour, manufacturing, fully loaded</span></p>
+          {engineerByAbbr(abbr) ? (
+            <p className="detail-rate">{money(salariedCost(engineerByAbbr(abbr)!.wage).total)} <span>salaried hour, industrial engineer plus {pct(SALARIED_LOAD)} benefit load</span></p>
+          ) : (
+            <p className="detail-rate"><span>BLS did not publish a May 2023 industrial-engineer wage for this state.</span></p>
+          )}
           <dl className="detail-stats">
             <div><dt>Production wage</dt><dd>{money(bench.wage)}</dd></div>
-            <div><dt>Union members</dt><dd>{bench.unionPct.toFixed(1)}%</dd></div>
-            <div><dt>Unemployment</dt><dd>{bench.unemployment.toFixed(1)}%</dd></div>
-            <div><dt>Price level</dt><dd>{bench.rpp ?? "Not pulled"}</dd></div>
+            <div><dt>Union members</dt><dd>{bench.unionPct == null ? "—" : `${bench.unionPct.toFixed(1)}%`}</dd></div>
+            <div><dt>Unemployment</dt><dd>{bench.unemployment == null ? "—" : `${bench.unemployment.toFixed(1)}%`}</dd></div>
+            <div><dt>Price level</dt><dd>{bench.rpp ?? "—"}</dd></div>
           </dl>
           <p className="vs">
             The GM scenario rate is {money(gm)}, {money(gm - bench.total)} above this state average. The gap is expected: one number is a national auto contract, the other is every manufacturing production job in the state.
           </p>
           {abbr === "MI" && (
             <p className="vs">
-              Flint and Detroit UAW–GM production wages match Tonawanda. The $29.00 Michigan figure is the all-manufacturing average, not the GM plant rate. Ohio, Prudenville, and Idaho are still open research items.
+              Flint and Detroit UAW–GM production wages match Tonawanda. The $29.00 Michigan figure is the all-manufacturing average, not the GM plant rate. A Prudenville plant rate is still open.
+            </p>
+          )}
+          {abbr === "OH" && (
+            <p className="vs">
+              Ohio’s manufacturing average is the sister-plant comparison. A UAW–GM plant in Ohio would still pay the national card, the same hour as Tonawanda.
             </p>
           )}
         </>
       ) : (
         <p className="vs">
-          {abbr === "OH"
-            ? "Ohio is the sister-plant comparison the brief asks for. The UAW–GM card would match New York. The state manufacturing average is not in the October 9 dataset."
-            : "This state is drawn so the region is readable. It does not have a wage row in the October 9 East Coast vintage."}
+          This state is drawn so the region is readable. It does not have a 2025 manufacturing wage in the file.
         </p>
       )}
       {sites.length > 0 && (
@@ -829,6 +856,7 @@ function RankTable({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => v
             <th>State</th>
             <th>Wage</th>
             <th>Fully loaded</th>
+            <th>Salaried</th>
             <th>Union</th>
             <th>Unemployment</th>
             <th>Role</th>
@@ -841,12 +869,13 @@ function RankTable({ abbr, onPick }: { abbr: string; onPick: (abbr: string) => v
               className={state.abbr === abbr ? "picked" : ""}
               onClick={() => onPick(state.abbr)}
             >
-              <td>{index < 4 ? "High" : index < 8 ? "Mid" : "Low"}</td>
+              <td>{index < Math.ceil(ranked.length / 3) ? "High" : index < Math.ceil((ranked.length * 2) / 3) ? "Mid" : "Low"}</td>
               <td>{state.name}</td>
               <td>{money(state.wage)}</td>
               <td>{money(state.total)}</td>
-              <td>{state.unionPct.toFixed(1)}%</td>
-              <td>{state.unemployment.toFixed(1)}%</td>
+              <td>{engineerByAbbr(state.abbr) ? money(salariedCost(engineerByAbbr(state.abbr)!.wage).total) : "—"}</td>
+              <td>{state.unionPct == null ? "—" : `${state.unionPct.toFixed(1)}%`}</td>
+              <td>{state.unemployment == null ? "—" : `${state.unemployment.toFixed(1)}%`}</td>
               <td>{state.role}</td>
             </tr>
           ))}
@@ -863,8 +892,8 @@ function Compare({ rate, bench }: { rate: Build; bench: StateBench | undefined }
     bench
       ? { label: `${bench.name} manufacturing`, note: "2025 average × 1.496", value: bench.total, tone: "state" }
       : null,
-    { label: "Connecticut, high state", note: "Top of this vintage", value: STATE_MAX, tone: "state" },
-    { label: "North Carolina, low state", note: "Bottom of this vintage", value: STATE_MIN, tone: "state" },
+    { label: `${extremeState("high").name}, high state`, note: "Top of this vintage", value: STATE_MAX, tone: "state" },
+    { label: `${extremeState("low").name}, low state`, note: "Bottom of this vintage", value: STATE_MIN, tone: "state" },
     { label: "Hyundai entry, 2024", note: "Nonunion, low confidence", value: HYUNDAI.total, tone: "other" },
     { label: "ECEC union manufacturing", note: "June 2026, all union plants", value: ECEC.union.total, tone: "other" },
     { label: "ECEC nonunion manufacturing", note: "June 2026", value: ECEC.nonunion.total, tone: "other" },

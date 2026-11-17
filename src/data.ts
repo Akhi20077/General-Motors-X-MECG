@@ -61,13 +61,17 @@ export type StateBench = {
   name: string;
   wage: number;
   total: number;
-  unionPct: number;
-  unemployment: number;
+  unionPct: number | null;
+  unemployment: number | null;
   rpp: number | null;
   role: string;
 };
 
-/** All-manufacturing production workers, 2025. Total uses the ECEC all-manufacturing benefits ratio (×1.496), not the GM contract build. */
+/**
+ * All-manufacturing production workers, BLS SAE Table 3, 2025 annual average.
+ * Total uses the ECEC all-manufacturing benefits ratio (×1.496), not the GM contract build.
+ * Union density, unemployment, and price level are filled only where the October 9 research published them.
+ */
 export const STATES: StateBench[] = [
   { abbr: "CT", name: "Connecticut", wage: 29.75, total: 44.51, unionPct: 16.1, unemployment: 5.1, rpp: null, role: "Wage benchmark" },
   { abbr: "MA", name: "Massachusetts", wage: 29.45, total: 44.06, unionPct: 14.5, unemployment: 4.3, rpp: null, role: "Wage benchmark" },
@@ -80,7 +84,45 @@ export const STATES: StateBench[] = [
   { abbr: "PA", name: "Pennsylvania", wage: 27.3, total: 40.84, unionPct: 10.9, unemployment: 3.7, rpp: 97.6, role: "UAW truck" },
   { abbr: "NJ", name: "New Jersey", wage: 26.69, total: 39.93, unionPct: 14.7, unemployment: 4.3, rpp: 108.8, role: "Wage benchmark" },
   { abbr: "GA", name: "Georgia", wage: 24.57, total: 36.76, unionPct: 5.1, unemployment: 3.2, rpp: 96.3, role: "Nonunion OEMs" },
-  { abbr: "NC", name: "North Carolina", wage: 23.5, total: 35.16, unionPct: 2.5, unemployment: 3.5, rpp: 94.3, role: "UAW truck · lowest wage" },
+  { abbr: "NC", name: "North Carolina", wage: 23.5, total: 35.16, unionPct: 2.5, unemployment: 3.5, rpp: 94.3, role: "UAW truck" },
+  { abbr: "FL", name: "Florida", wage: 30.27, total: 45.28, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "ME", name: "Maine", wage: 28.97, total: 43.34, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "NH", name: "New Hampshire", wage: 28.26, total: 42.28, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "OH", name: "Ohio", wage: 27.41, total: 41.01, unionPct: null, unemployment: null, rpp: null, role: "Sister-plant state" },
+  { abbr: "WI", name: "Wisconsin", wage: 27.35, total: 40.92, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "KY", name: "Kentucky", wage: 27.19, total: 40.68, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "VT", name: "Vermont", wage: 26.91, total: 40.26, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "AL", name: "Alabama", wage: 25.99, total: 38.88, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "RI", name: "Rhode Island", wage: 25.95, total: 38.82, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "IN", name: "Indiana", wage: 25.69, total: 38.43, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "WV", name: "West Virginia", wage: 25.03, total: 37.44, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "TN", name: "Tennessee", wage: 24.62, total: 36.83, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "AK", name: "Alaska", wage: 22.0, total: 32.91, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "AZ", name: "Arizona", wage: 27.35, total: 40.92, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "AR", name: "Arkansas", wage: 23.83, total: 35.65, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "CA", name: "California", wage: 32.78, total: 49.04, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "CO", name: "Colorado", wage: 33.69, total: 50.4, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "HI", name: "Hawaii", wage: 30.52, total: 45.66, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "ID", name: "Idaho", wage: 26.01, total: 38.91, unionPct: null, unemployment: null, rpp: null, role: "Project brief" },
+  { abbr: "IL", name: "Illinois", wage: 27.3, total: 40.84, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "IA", name: "Iowa", wage: 25.63, total: 38.34, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "KS", name: "Kansas", wage: 23.78, total: 35.57, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "LA", name: "Louisiana", wage: 31.4, total: 46.97, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "MN", name: "Minnesota", wage: 30.68, total: 45.9, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "MS", name: "Mississippi", wage: 23.28, total: 34.83, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "MO", name: "Missouri", wage: 27.55, total: 41.21, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "MT", name: "Montana", wage: 25.3, total: 37.85, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "NE", name: "Nebraska", wage: 26.47, total: 39.6, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "NV", name: "Nevada", wage: 24.79, total: 37.09, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "NM", name: "New Mexico", wage: 25.57, total: 38.25, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "ND", name: "North Dakota", wage: 27.11, total: 40.56, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "OK", name: "Oklahoma", wage: 25.47, total: 38.1, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "OR", name: "Oregon", wage: 29.95, total: 44.81, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "SD", name: "South Dakota", wage: 25.49, total: 38.13, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "TX", name: "Texas", wage: 31.47, total: 47.08, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "UT", name: "Utah", wage: 26.98, total: 40.36, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "WA", name: "Washington", wage: 35.34, total: 52.87, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
+  { abbr: "WY", name: "Wyoming", wage: 33.66, total: 50.36, unionPct: null, unemployment: null, rpp: null, role: "Manufacturing benchmark" },
 ];
 
 export const STATE_MIN = Math.min(...STATES.map((s) => s.total));
@@ -88,6 +130,12 @@ export const STATE_MAX = Math.max(...STATES.map((s) => s.total));
 
 export function stateByAbbr(abbr: string) {
   return STATES.find((s) => s.abbr === abbr);
+}
+
+export function extremeState(kind: "low" | "high") {
+  return STATES.reduce((best, state) =>
+    kind === "low" ? (state.total < best.total ? state : best) : state.total > best.total ? state : best,
+  );
 }
 
 export type Facility = {
@@ -253,7 +301,9 @@ export const SOURCES = [
   ]},
   { group: "Government", items: [
     "BLS ECEC, June 2026, Tables 4, 5, and 7 — benefit cost per hour",
-    "BLS State and Area Employment, production-worker earnings by state, 2025",
+    "BLS SAE Table 3, 2025 annual average — production employees on manufacturing payrolls, all 50 states. Fully loaded total is that wage × 1.496.",
+    "BLS OEWS, May 2023 — industrial engineers (SOC 17-2112), state mean hourly wage. BLS does not publish a separate manufacturing-engineer wage. Alaska has no published estimate for this occupation.",
+    "BLS ECEC Table 4, June 2025 — private industry, professional and related occupations. Benefits $21.33 on a $48.88 wage, applied to the state engineer wage.",
     "BLS Union Members 2025 — state union density",
     "BLS LAUS — state unemployment, August 2026",
     "BLS CPI, August 2026 — CPI-W +3.5%, the COLA driver",

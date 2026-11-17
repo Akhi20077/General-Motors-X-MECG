@@ -6,6 +6,7 @@ import {
   LEVELS,
   STATE_MAX,
   STATE_MIN,
+  extremeState,
   TOP_BASE,
   type LevelId,
   type RateGroup,
@@ -191,14 +192,14 @@ export function judgeQuote(quote: number, rate: Build): QuoteFlag {
     return {
       tone: "between",
       title: "Between nonunion entry and the state band",
-      detail: `${money(quote)} is above the Hyundai entry benchmark and below the lowest state manufacturing total in this vintage (${money(STATE_MIN)} in North Carolina).`,
+      detail: `${money(quote)} is above the Hyundai entry benchmark and below the lowest state manufacturing total in this vintage (${money(STATE_MIN)} in ${extremeState("low").name}).`,
     };
   }
   if (quote <= STATE_MAX) {
     return {
       tone: "region",
       title: "Inside the regional manufacturing band",
-      detail: `${money(quote)} falls between ${money(STATE_MIN)} in North Carolina and ${money(STATE_MAX)} in Connecticut. That band is all-manufacturing production work, not a UAW auto rate.`,
+      detail: `${money(quote)} falls between ${money(STATE_MIN)} in ${extremeState("low").name} and ${money(STATE_MAX)} in ${extremeState("high").name}. That band is all-manufacturing production work, not a UAW auto rate.`,
     };
   }
   return {
